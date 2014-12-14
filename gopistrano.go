@@ -102,10 +102,24 @@ func main() {
 		fmt.Println("Cool Beans! Gopistrano created the structure correctly!")
 		return
 	} else if strings.EqualFold(args, "deploy") {
-		// check that the releases directory exists
+		session, err := client.NewSession()
+		if err != nil {
+			panic("Failed to create session: " + err.Error())
+		}
+		defer session.Close()
+		deployCmd := sudo + "if [ ! -d " + releases + " ]; then exit 1; fi &&" +
+			"if [ ! -d " + shared + " ]; then exit 1; fi &&" +
+			"if [ ! -d " + utils + " ]; then exit 1; fi &&" +
+			"if [ ! -f " + utils + "/deploy.sh ]; then exit 1; fi &&" +
+			"bash " + utils + "/deploy.sh " + path + " " + repository
+		if err := session.Run(deployCmd); err != nil {
+			panic("Failed to run: " + err.Error())
+		}
+		var b bytes.Buffer
+		session.Stdout = &b
+		fmt.Println("Project Deployed!")
 	} else {
 		fmt.Println("You have to run deploy or deploy:setup")
 		return
 	}
-	//	fmt.Println(b.String())
 }

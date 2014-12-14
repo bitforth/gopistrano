@@ -1,6 +1,6 @@
 #!/bin/bash
-# uncomment line below if you want verbose output
-# set+x 
+# comment line below if you want quiet output
+set +x 
 
 DEPLOYMENT_PATH=$1
 REPOSITORY=$2
@@ -20,8 +20,8 @@ else
 	cd "$DEPLOYMENT_PATH/shared/cached-copy"
 	git rev-list --max-count=1 HEAD | xargs git checkout -q -b deploy
 fi
-cp -RPp "$DEPLOYMENT_PATH/shared/cached-copy" "/usr/share/www/agorema.com/releases/$CUR_TIMESTAMP"
-git rev-list --max-count=1 HEAD > "/usr/share/www/agorema.com/releases/$CUR_TIMESTAMP/REVISION"
+cp -RPp "$DEPLOYMENT_PATH/shared/cached-copy" "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP"
+git rev-list --max-count=1 HEAD > "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP/REVISION"
 chmod -R g+w "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP"
 
 
