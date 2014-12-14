@@ -5,7 +5,7 @@ import (
 	"code.google.com/p/go.crypto/ssh"
 	"code.google.com/p/goconf/conf"
 	"fmt"
-	"github.com/laher/scp-go/scp"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -13,6 +13,11 @@ import (
 )
 
 func main() {
+
+	if len(os.Args) == 1 {
+		fmt.Println("This is not the right way to use this program! use gopistrano deploy or gopistrano deploy:setup")
+		return
+	}
 	args := os.Args[1]
 
 	// reading config file
@@ -23,12 +28,18 @@ func main() {
 	repository, err := c.GetString("", "repository")
 	path, err := c.GetString("", "path")
 	timestamp := time.Now().Local()
-	releases := path + "releases"
-	shared := path + "shared"
-	utils := path + "utils"
-	release := path + timestamp.Format("20060102150405")
+	releases := path + "/releases"
+	shared := path + "/shared"
+	utils := path + "/utils"
+	release := path + "/" + timestamp.Format("20060102150405")
 	use_sudo, err := c.GetBool("false", "use_sudo")
 	keep_releases, err := c.GetInt("3", "keep_releases")
+	deployment_script, err := ioutil.ReadFile("utils/deploy.sh")
+
+	fmt.Println(repository)
+	fmt.Println(release)
+	fmt.Println(keep_releases)
+	fmt.Println(utils)
 
 	sudo := ""
 	if use_sudo {
@@ -69,61 +80,29 @@ func main() {
 		var b bytes.Buffer
 		session.Stdout = &b
 
-		scpArgs := []string{"utils/*", user + "@" + hostname + ":" + utils}
-		// Creating another connection to scp the file
-		err, status := scp.ScpCli(scpArgs)
+		fmt.Println("running scp connection")
+		scpSession, err := client.NewSession()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(status)
+			panic("Failed to create session: " + err.Error())
 		}
-	} else if strings.EqualFold(args, "deploy") {
-		// check that the releases directory exists
-		fmt.Println("Checking if " + releases + " exists")
-		cdPathCmd := sudo + "if [ ! -d " + releases + " ]; then exit 1; fi"
-		if err := session.Run(cdPathCmd); err != nil {
-			fmt.Println("You have to run deploy:setup before running deploy!")
+		defer scpSession.Close()
+
+		go func() {
+			w, _ := scpSession.StdinPipe()
+			defer w.Close()
+			content := string(deployment_script)
+			fmt.Fprintln(w, "C0755 "+strconv.Itoa(len(content))+" deploy.sh")
+			fmt.Fprint(w, content)
+			fmt.Fprint(w, "\x00")
+		}()
+		if err := scpSession.Run("/usr/bin/scp -t " + utils); err != nil {
+			fmt.Println(err.Error())
 			return
 		}
-
-		fmt.Println(releases + " exists")
-
-		fmt.Println("Counting directories...")
-		directoryCountCmd := sudo + "ls -lR " + releases + " | grep ^d | wc -l"
-		fmt.Println(directoryCountCmd)
-		if err := session.Run(directoryCountCmd); err != nil {
-			panic("Failed to run: " + err.Error())
-		}
-		// counting number of directories in releases
-		directoryCount, err := strconv.Atoi(b.String())
-		if err != nil {
-			panic("Failed conversion to integer: " + err.Error())
-		}
-		if directoryCount == keep_releases {
-			// removing oldest directory
-			removeOldestDirectoryCmd := sudo + "rm -Rf $(ls -td " + releases + "/* | cut -d' ' -f1 | tail -1)"
-			if err := session.Run(removeOldestDirectoryCmd); err != nil {
-				panic("Failed to run: " + err.Error())
-			}
-
-		} else {
-			// creating directory for new release
-			timestampDirCmd := sudo + "mkdir " + release
-			if err := session.Run(timestampDirCmd); err != nil {
-				panic("Failed to run: " + err.Error())
-			}
-
-			// cloning repository into directory
-			gitCloneCmd := sudo + "git clone " + repository + " " + release
-			if err := session.Run(gitCloneCmd); err != nil {
-				panic("Failed to run: " + err.Error())
-			}
-
-			//symbolic link the latest release
-			symLinkReleaseCmd := sudo + "ln -s " + release + " current"
-			if err := session.Run(symLinkReleaseCmd); err != nil {
-				panic("Failed to run: " + err.Error())
-			}
-		}
+		fmt.Println("Cool Beans! Gopistrano created the structure correctly!")
+		return
+	} else if strings.EqualFold(args, "deploy") {
+		// check that the releases directory exists
 	} else {
 		fmt.Println("You have to run deploy or deploy:setup")
 		return
