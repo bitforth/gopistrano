@@ -1,9 +1,10 @@
 #!/bin/bash
 # comment line below if you want quiet output
-set +x 
+set -x 
 
 DEPLOYMENT_PATH=$1
 REPOSITORY=$2
+KEEP_RELEASES=$3
 # variable init
 CUR_TIMESTAMP=`date +"%Y%m%d%H%M%S"`
 
@@ -24,6 +25,5 @@ cp -RPp "$DEPLOYMENT_PATH/shared/cached-copy" "$DEPLOYMENT_PATH/releases/$CUR_TI
 git rev-list --max-count=1 HEAD > "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP/REVISION"
 chmod -R g+w "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP"
 
-
 rm -f "$DEPLOYMENT_PATH/current" &&  ln -s "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP" "$DEPLOYMENT_PATH/current"
-ls -1dt "$DEPLOYMENT_PATH"/releases/* | tail -n +6 |  xargs rm -rf
+ls -1dt "$DEPLOYMENT_PATH/releases/*" | tail -n +$KEEP_RELEASES |  xargs rm -rf

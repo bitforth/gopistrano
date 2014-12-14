@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func main() {
@@ -27,24 +26,11 @@ func main() {
 	hostname, err := c.GetString("", "hostname")
 	repository, err := c.GetString("", "repository")
 	path, err := c.GetString("", "path")
-	timestamp := time.Now().Local()
 	releases := path + "/releases"
 	shared := path + "/shared"
 	utils := path + "/utils"
-	release := path + "/" + timestamp.Format("20060102150405")
-	use_sudo, err := c.GetBool("false", "use_sudo")
-	keep_releases, err := c.GetInt("3", "keep_releases")
+	keep_releases, err := c.GetString("3", "keep_releases")
 	deployment_script, err := ioutil.ReadFile("utils/deploy.sh")
-
-	fmt.Println(repository)
-	fmt.Println(release)
-	fmt.Println(keep_releases)
-	fmt.Println(utils)
-
-	sudo := ""
-	if use_sudo {
-		sudo = "sudo "
-	}
 
 	fmt.Println("SSH-ing into " + hostname)
 	// initialize the structure with the configuration for ssh packat.
@@ -70,7 +56,7 @@ func main() {
 			panic("Failed to create session: " + err.Error())
 		}
 		defer session.Close()
-		cdPathCmd := sudo + "if [ ! -d " + releases + " ]; then mkdir " + releases + "; fi &&" +
+		cdPathCmd := "if [ ! -d " + releases + " ]; then mkdir " + releases + "; fi &&" +
 			"if [ ! -d " + shared + " ]; then mkdir " + shared + "; fi &&" +
 			"if [ ! -d " + utils + " ]; then mkdir " + utils + "; fi &&" +
 			"chmod g+w " + releases + " " + shared + " " + path + " " + utils
@@ -107,11 +93,11 @@ func main() {
 			panic("Failed to create session: " + err.Error())
 		}
 		defer session.Close()
-		deployCmd := sudo + "if [ ! -d " + releases + " ]; then exit 1; fi &&" +
+		deployCmd := "if [ ! -d " + releases + " ]; then exit 1; fi &&" +
 			"if [ ! -d " + shared + " ]; then exit 1; fi &&" +
 			"if [ ! -d " + utils + " ]; then exit 1; fi &&" +
 			"if [ ! -f " + utils + "/deploy.sh ]; then exit 1; fi &&" +
-			"bash " + utils + "/deploy.sh " + path + " " + repository
+			"bash " + utils + "/deploy.sh " + path + " " + repository + " " + keep_releases
 		if err := session.Run(deployCmd); err != nil {
 			panic("Failed to run: " + err.Error())
 		}
