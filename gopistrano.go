@@ -3,6 +3,7 @@ package main
 import (
 	"code.google.com/p/go.crypto/ssh"
 	"code.google.com/p/goconf/conf"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -54,12 +55,14 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
 
-	if len(os.Args) == 1 {
+	action := flag.Arg(0)
+
+	if action == "" {
 		fmt.Println("Error: use gopistrano deploy or gopistrano deploy:setup")
 		return
 	}
-	args := os.Args[1]
 
 	fmt.Println("SSH-ing into " + hostname)
 
@@ -78,7 +81,7 @@ func main() {
 		return
 	}
 
-	switch strings.ToLower(args) {
+	switch strings.ToLower(action) {
 	case "deploy:setup":
 		err = deploySetup(client)
 	case "deploy":
