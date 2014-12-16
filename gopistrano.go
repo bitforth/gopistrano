@@ -5,7 +5,6 @@ import (
 	"code.google.com/p/goconf/conf"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 )
@@ -21,8 +20,6 @@ var (
 	utils,
 	keep_releases string
 )
-
-var deployment_script []byte
 
 func init() {
 	var err error
@@ -43,9 +40,7 @@ func init() {
 	shared = path + "/shared"
 	utils = path + "/utils"
 
-	keep_releases, err = c.GetString("3", "keep_releases")
-
-	deployment_script, err = ioutil.ReadFile("utils/deploy.sh")
+	keep_releases, err = c.GetString("", "keep_releases")
 
 	//just log whichever we get; let the user re-run the program to see all errors... for now
 	if err != nil {
