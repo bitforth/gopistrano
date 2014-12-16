@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	_ "runtime"
 	"strings"
 )
 
