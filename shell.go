@@ -1,9 +1,8 @@
 package main
 
-var deployment_script string = `
-#!/bin/bash
+var deployment_script string = `#!/bin/bash
 # comment line below if you want quiet output
-set -x 
+#set -x 
 
 DEPLOYMENT_PATH=$1
 REPOSITORY=$2
