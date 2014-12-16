@@ -11,28 +11,54 @@ import (
 	"strings"
 )
 
+var (
+	user,
+	pass,
+	hostname,
+	repository,
+	path,
+	releases,
+	shared,
+	utils,
+	keep_releases string
+)
+
+var deployment_script []byte
+
+func init() {
+	var err error
+	// reading config file
+	c, err := conf.ReadConfigFile("Gopfile")
+	user, err = c.GetString("", "username")
+	pass, err = c.GetString("", "password")
+	hostname, err = c.GetString("", "hostname")
+	repository, err = c.GetString("", "repository")
+	path, err = c.GetString("", "path")
+	releases = path + "/releases"
+	shared = path + "/shared"
+	utils = path + "/utils"
+
+	keep_releases, err = c.GetString("3", "keep_releases")
+
+	deployment_script, err = ioutil.ReadFile("utils/deploy.sh")
+
+	//just log whichever we get; let the user re-run the program to see all errors... for now
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+}
+
 func main() {
 
 	if len(os.Args) == 1 {
-		fmt.Println("This is not the right way to use this program! use gopistrano deploy or gopistrano deploy:setup")
+		fmt.Println("Error: use gopistrano deploy or gopistrano deploy:setup")
 		return
 	}
 	args := os.Args[1]
 
-	// reading config file
-	c, err := conf.ReadConfigFile("Gopfile")
-	user, err := c.GetString("", "username")
-	pass, err := c.GetString("", "password")
-	hostname, err := c.GetString("", "hostname")
-	repository, err := c.GetString("", "repository")
-	path, err := c.GetString("", "path")
-	releases := path + "/releases"
-	shared := path + "/shared"
-	utils := path + "/utils"
-	keep_releases, err := c.GetString("3", "keep_releases")
-	deployment_script, err := ioutil.ReadFile("utils/deploy.sh")
-
 	fmt.Println("SSH-ing into " + hostname)
+
 	// initialize the structure with the configuration for ssh packat.
 	config := &ssh.ClientConfig{
 		User: user,
