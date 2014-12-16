@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	_ "runtime"
 	"strings"
 )
 
@@ -49,6 +50,85 @@ func init() {
 	}
 }
 
+type deploy struct {
+	cl *ssh.Client
+}
+
+//returns a new deployment
+func newDeploy() (d *deploy, err error) {
+	cfg := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(pass),
+		},
+	}
+
+	fmt.Println("SSH-ing into " + hostname)
+	cl, err := ssh.Dial("tcp", hostname+":22", cfg)
+
+	d = &deploy{cl: cl}
+
+	return
+}
+
+// runs the deployment script remotely
+func (d *deploy) Run() error {
+	deployCmd := "if [ ! -d " + releases + " ]; then exit 1; fi &&" +
+		"if [ ! -d " + shared + " ]; then exit 1; fi &&" +
+		"if [ ! -d " + utils + " ]; then exit 1; fi &&" +
+		"if [ ! -f " + utils + "/deploy.sh ]; then exit 1; fi &&" +
+		"" + utils + "/deploy.sh " + path + " " + repository + " " + keep_releases
+
+	if err := d.runCmd(deployCmd); err != nil {
+		return err
+	}
+
+	fmt.Println("Project Deployed!")
+	return nil
+}
+
+// sets up directories for deployment a la capistrano
+func (d *deploy) Setup() error {
+
+	cdPathCmd := "if [ ! -d " + releases + " ]; then mkdir " + releases + "; fi &&" +
+		"if [ ! -d " + shared + " ]; then mkdir " + shared + "; fi &&" +
+		"if [ ! -d " + utils + " ]; then mkdir " + utils + "; fi &&" +
+		"chmod g+w " + releases + " " + shared + " " + path + " " + utils
+
+	if err := d.runCmd(cdPathCmd); err != nil {
+		return err
+	}
+
+	fmt.Println("running scp connection")
+
+	cpy := `echo -n '` + string(deployment_script) + `' > ` + utils + `/deploy.sh ; chmod +x ` + utils + `/deploy.sh`
+
+	if err := d.runCmd(cpy); err != nil {
+		return err
+	}
+
+	fmt.Println("Cool Beans! Gopistrano created the structure correctly!")
+	return nil
+}
+
+// basic ssh cmd runner
+func (d *deploy) runCmd(cmd string) (err error) {
+	session, err := d.cl.NewSession()
+	if err != nil {
+		return err
+	}
+
+	//this *does* return an error (EOF of some sort), but I guess we don't care?
+	//the ssh lib needs to send it and must return it or something
+	defer session.Close()
+
+	//send through to main stdout, stderr
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+
+	return session.Run(cmd)
+}
+
 func main() {
 	flag.Parse()
 
@@ -59,28 +139,18 @@ func main() {
 		return
 	}
 
-	fmt.Println("SSH-ing into " + hostname)
-
-	// initialize the structure with the configuration for ssh packat.
-	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(pass),
-		},
-	}
-
-	client, err := ssh.Dial("tcp", hostname+":22", config)
+	deploy, err := newDeploy()
 	// Do panic if the dial fails
 	if err != nil {
-		fmt.Println("Failed to dial: " + err.Error())
+		fmt.Println("Failed to start: " + err.Error())
 		return
 	}
 
 	switch strings.ToLower(action) {
 	case "deploy:setup":
-		err = deploySetup(client)
+		err = deploy.Setup()
 	case "deploy":
-		err = deploy(client)
+		err = deploy.Run()
 	default:
 		fmt.Println("Invalid command!")
 	}
@@ -88,70 +158,4 @@ func main() {
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-}
-
-// runs the deployment script remotely
-func deploy(client *ssh.Client) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-	deployCmd := "if [ ! -d " + releases + " ]; then exit 1; fi &&" +
-		"if [ ! -d " + shared + " ]; then exit 1; fi &&" +
-		"if [ ! -d " + utils + " ]; then exit 1; fi &&" +
-		"if [ ! -f " + utils + "/deploy.sh ]; then exit 1; fi &&" +
-		"bash " + utils + "/deploy.sh " + path + " " + repository + " " + keep_releases
-
-	if err := session.Run(deployCmd); err != nil {
-		return err
-	}
-
-	//send through
-	session.Stdout = os.Stdout
-	session.Stderr = os.Stderr
-
-	fmt.Println("Project Deployed!")
-	return nil
-}
-
-// sets up directories for deployment a la capistrano
-func deploySetup(client *ssh.Client) error {
-	session, err := client.NewSession()
-	if err != nil {
-		return err
-	}
-
-	//send through to main stdout, stderr
-	session.Stdout = os.Stdout
-	session.Stderr = os.Stderr
-
-	defer session.Close()
-
-	cdPathCmd := "if [ ! -d " + releases + " ]; then mkdir " + releases + "; fi &&" +
-		"if [ ! -d " + shared + " ]; then mkdir " + shared + "; fi &&" +
-		"if [ ! -d " + utils + " ]; then mkdir " + utils + "; fi &&" +
-		"chmod g+w " + releases + " " + shared + " " + path + " " + utils
-
-	if err := session.Run(cdPathCmd); err != nil {
-		return err
-	}
-
-	fmt.Println("running scp connection")
-
-	scpSession, err := client.NewSession()
-	if err != nil {
-		return err
-	}
-
-	defer scpSession.Close()
-
-	cpy := `echo -n '` + string(deployment_script) + `' > ` + utils + `/deploy.sh ; chmod +x ` + utils + `/deploy.sh`
-
-	if err := scpSession.Run(cpy); err != nil {
-		return err
-	}
-
-	fmt.Println("Cool Beans! Gopistrano created the structure correctly!")
-	return nil
 }
