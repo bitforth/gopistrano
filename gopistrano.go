@@ -139,7 +139,6 @@ func deploySetup(client *ssh.Client) error {
 		"chmod g+w " + releases + " " + shared + " " + path + " " + utils
 
 	if err := session.Run(cdPathCmd); err != nil {
-		//use return to allow the session to clos, etc
 		return err
 	}
 
