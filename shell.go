@@ -28,5 +28,5 @@ git rev-list --max-count=1 HEAD > "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP/REVI
 chmod -R g+w "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP"
 
 rm -f "$DEPLOYMENT_PATH/current" &&  ln -s "$DEPLOYMENT_PATH/releases/$CUR_TIMESTAMP" "$DEPLOYMENT_PATH/current"
-ls -1dt "$DEPLOYMENT_PATH/releases/*" | tail -n +$KEEP_RELEASES |  xargs rm -rf
+ls -1dt "$DEPLOYMENT_PATH/releases" | tail -n +$KEEP_RELEASES |  xargs rm -rf
 `
