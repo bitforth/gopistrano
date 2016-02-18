@@ -1,8 +1,8 @@
 package main
 
 import (
-	"code.google.com/p/go.crypto/ssh"
-	"code.google.com/p/goconf/conf"
+	"golang.org/x/crypto/ssh"
+	"github.com/alanchavez88/goconf"
 	"flag"
 	"fmt"
 	"os"
