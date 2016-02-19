@@ -1,31 +1,38 @@
 package main
 
 import (
-	"golang.org/x/crypto/ssh"
-	"github.com/alanchavez88/goconf"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
+
+	"github.com/alanchavez88/goconf"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
 	user,
 	pass,
 	hostname,
+	port,
 	repository,
 	path,
 	releases,
 	shared,
 	utils,
-	keep_releases string
+	publicKey,
+	keepReleases string
 )
+
+type deploy struct {
+	cl *ssh.Client
+}
 
 func init() {
 	var err error
-	// reading config file
-
 	c, err := conf.ReadConfigFile("Gopfile")
+
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -33,41 +40,110 @@ func init() {
 
 	user, err = c.GetString("", "username")
 	pass, err = c.GetString("", "password")
+	publicKey, err = c.GetString("", "public_key")
 	hostname, err = c.GetString("", "hostname")
 	repository, err = c.GetString("", "repository")
+	port, err = c.GetString("", "port")
 	path, err = c.GetString("", "path")
 	releases = path + "/releases"
 	shared = path + "/shared"
 	utils = path + "/utils"
 
-	keep_releases, err = c.GetString("", "keep_releases")
+	keepReleases, err = c.GetString("", "keep_releases")
 
-	//just log whichever we get; let the user re-run the program to see all errors... for now
+	// just log whichever we get; let the user re-run the program to see all errors..
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 }
 
-type deploy struct {
-	cl *ssh.Client
-}
+func main() {
+	flag.Parse()
 
-//returns a new deployment
-func newDeploy() (d *deploy, err error) {
-	cfg := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(pass),
-		},
+	action := flag.Arg(0)
+
+	if action == "" {
+		fmt.Println("Error: use gopistrano deploy or gopistrano deploy:setup")
+		return
 	}
 
-	fmt.Println("SSH-ing into " + hostname)
-	cl, err := ssh.Dial("tcp", hostname+":22", cfg)
+	deploy, err := newDeploy()
 
-	d = &deploy{cl: cl}
+	// Do panic if the dial fails
+	if err != nil {
+		fmt.Println("Failed to start: " + err.Error())
+		return
+	}
 
+	switch strings.ToLower(action) {
+	case "deploy:setup":
+		err = deploy.Setup()
+	case "deploy":
+		err = deploy.Run()
+	default:
+		fmt.Println("Invalid command!")
+	}
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
+// returns a new deployment
+func newDeploy() (d *deploy, err error) {
+	if pass != "" && user != "" {
+		cfg := &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{
+				ssh.Password(pass),
+			},
+		}
+
+		fmt.Println("SSH-ing into " + hostname)
+		cl, err := ssh.Dial("tcp", hostname+":"+port, cfg)
+
+		if err != nil {
+			return nil, err
+		}
+
+		d = &deploy{cl: cl}
+	} else if publicKey != "" && user != "" {
+		cfg := &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{
+				publicKeyFile(publicKey),
+			},
+		}
+
+		fmt.Println("SSH-ing into " + hostname + " with public key " + publicKey)
+		cl, err := ssh.Dial("tcp", hostname+":"+port, cfg)
+
+		if err != nil {
+			return nil, err
+		}
+
+		d = &deploy{cl: cl}
+	} else {
+		panic("Unable to authenticate with server")
+	}
 	return
+}
+
+func publicKeyFile(file string) ssh.AuthMethod {
+	buffer, err := ioutil.ReadFile(file)
+
+	if err != nil {
+		return nil
+	}
+
+	key, err := ssh.ParsePrivateKey(buffer)
+
+	if err != nil {
+		return nil
+	}
+
+	return ssh.PublicKeys(key)
 }
 
 // runs the deployment script remotely
@@ -76,7 +152,7 @@ func (d *deploy) Run() error {
 		"if [ ! -d " + shared + " ]; then exit 1; fi &&" +
 		"if [ ! -d " + utils + " ]; then exit 1; fi &&" +
 		"if [ ! -f " + utils + "/deploy.sh ]; then exit 1; fi &&" +
-		"" + utils + "/deploy.sh " + path + " " + repository + " " + keep_releases
+		"" + utils + "/deploy.sh " + path + " " + repository + " " + keepReleases
 
 	if err := d.runCmd(deployCmd); err != nil {
 		return err
@@ -88,7 +164,6 @@ func (d *deploy) Run() error {
 
 // sets up directories for deployment a la capistrano
 func (d *deploy) Setup() error {
-
 	cdPathCmd := "if [ ! -d " + releases + " ]; then mkdir " + releases + "; fi &&" +
 		"if [ ! -d " + shared + " ]; then mkdir " + shared + "; fi &&" +
 		"if [ ! -d " + utils + " ]; then mkdir " + utils + "; fi &&" +
@@ -98,7 +173,7 @@ func (d *deploy) Setup() error {
 		return err
 	}
 
-	fmt.Println("running scp connection")
+	fmt.Println("Running scp connection")
 
 	cpy := `echo -n '` + string(deployment_script) + `' > ` + utils + `/deploy.sh ; chmod +x ` + utils + `/deploy.sh`
 
@@ -126,35 +201,4 @@ func (d *deploy) runCmd(cmd string) (err error) {
 	session.Stderr = os.Stderr
 
 	return session.Run(cmd)
-}
-
-func main() {
-	flag.Parse()
-
-	action := flag.Arg(0)
-
-	if action == "" {
-		fmt.Println("Error: use gopistrano deploy or gopistrano deploy:setup")
-		return
-	}
-
-	deploy, err := newDeploy()
-	// Do panic if the dial fails
-	if err != nil {
-		fmt.Println("Failed to start: " + err.Error())
-		return
-	}
-
-	switch strings.ToLower(action) {
-	case "deploy:setup":
-		err = deploy.Setup()
-	case "deploy":
-		err = deploy.Run()
-	default:
-		fmt.Println("Invalid command!")
-	}
-
-	if err != nil {
-		fmt.Println(err.Error())
-	}
 }
