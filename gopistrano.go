@@ -21,7 +21,7 @@ var (
 	releases,
 	shared,
 	utils,
-	publicKey,
+	privateKey,
 	keepReleases string
 )
 
@@ -40,7 +40,7 @@ func init() {
 
 	user, err = c.GetString("", "username")
 	pass, err = c.GetString("", "password")
-	publicKey, err = c.GetString("", "public_key")
+	privateKey, err = c.GetString("", "private_key")
 	hostname, err = c.GetString("", "hostname")
 	repository, err = c.GetString("", "repository")
 	port, err = c.GetString("", "port")
@@ -108,15 +108,15 @@ func newDeploy() (d *deploy, err error) {
 		}
 
 		d = &deploy{cl: cl}
-	} else if publicKey != "" && user != "" {
+	} else if privateKey != "" && user != "" {
 		cfg := &ssh.ClientConfig{
 			User: user,
 			Auth: []ssh.AuthMethod{
-				publicKeyFile(publicKey),
+				publicKeyFile(privateKey),
 			},
 		}
 
-		fmt.Println("SSH-ing into " + hostname + " with public key " + publicKey)
+		fmt.Println("SSH-ing into " + hostname + " with private key " + privateKey)
 		cl, err := ssh.Dial("tcp", hostname+":"+port, cfg)
 
 		if err != nil {
