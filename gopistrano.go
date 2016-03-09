@@ -164,9 +164,9 @@ func (d *deploy) Run() error {
 
 // sets up directories for deployment a la capistrano
 func (d *deploy) Setup() error {
-	cdPathCmd := "if [ ! -d " + releases + " ]; then mkdir " + releases + "; fi &&" +
-		"if [ ! -d " + shared + " ]; then mkdir " + shared + "; fi &&" +
-		"if [ ! -d " + utils + " ]; then mkdir " + utils + "; fi &&" +
+	cdPathCmd := "if [ ! -d " + releases + " ]; then mkdir -p " + releases + "; fi &&" +
+		"if [ ! -d " + shared + " ]; then mkdir -p " + shared + "; fi &&" +
+		"if [ ! -d " + utils + " ]; then mkdir -p " + utils + "; fi &&" +
 		"chmod g+w " + releases + " " + shared + " " + path + " " + utils
 
 	if err := d.runCmd(cdPathCmd); err != nil {
