@@ -24,6 +24,7 @@ This is a sample Gopfile
 ```
 username = yourusername
 password = yourpassword
+# private_key = /home/user/.ssh/id_rsa
 hostname = example.com
 port = 22
 repository = https://github.com/alanchavez88/theHarvester.git
@@ -33,9 +34,9 @@ use_sudo = false
 webserver_user = nobody
 
 ```
-The file above will clone the git repository above into the path specified in the Gopfile. 
+The file above will clone the git repository above into the path specified in the Gopfile.
 
-Currently gopistrano only supports git, other version controls will be added in the future. 
+Currently gopistrano only supports git, other version controls will be added in the future.
 
 It also only supports username and password authentication, the next update will provide authenticate via PEM files and SSH Keys
 
